@@ -32,6 +32,7 @@ TWITTER_CONSUMER_SECRET = getattr(settings, 'TWITTER_CONSUMER_SECRET', '')
 FACEBOOK_APP_ID = getattr(settings, 'FACEBOOK_APP_ID', '')
 FACEBOOK_API_KEY = getattr(settings, 'FACEBOOK_API_KEY', '')
 FACEBOOK_SECRET_KEY = getattr(settings, 'FACEBOOK_SECRET_KEY', '')
+FACEBOOK_EXTENDED_PERMISSIONS = getattr(settings, 'FACEBOOK_EXTENDED_PERMISSIONS', [])
 
 
 def del_dict_key(src_dict, key):
@@ -213,6 +214,7 @@ def facebook_login(request):
     params = {}
     params["client_id"] = FACEBOOK_APP_ID
     params["redirect_uri"] = request.build_absolute_uri(reverse("socialauth_facebook_login_done"))
+    params["scope"] = ",".join(FACEBOOK_EXTENDED_PERMISSIONS)
 
     url = "https://graph.facebook.com/oauth/authorize?"+urllib.urlencode(params)
 
