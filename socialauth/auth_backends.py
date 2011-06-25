@@ -1,12 +1,14 @@
 from django.contrib.auth.models import User
 from django.core.urlresolvers import reverse
 from django.conf import settings
+from django.utils import simplejson as json
 import facebook
 
 import urllib
 from socialauth.lib import oauthtwitter2 as oauthtwitter
 from socialauth.models import OpenidProfile as UserAssociation, TwitterUserProfile, FacebookUserProfile, LinkedInUserProfile, AuthMeta
 from socialauth.lib.linkedin import *
+
 
 import random
 
@@ -222,7 +224,7 @@ class FacebookBackend:
             params = {}
             params["client_id"] = FACEBOOK_APP_ID
             params["client_secret"] = FACEBOOK_SECRET_KEY
-            params["redirect_uri"] = reverse("socialauth_facebook_login_done")[1:] 
+            params["redirect_uri"] = request.build_absolute_uri(reverse("socialauth_facebook_login_done"))
             params["code"] = request.GET.get('code', '')
 
             url = "https://graph.facebook.com/oauth/access_token?"+urllib.urlencode(params)
@@ -233,34 +235,37 @@ class FacebookBackend:
             if not res_parse_qs.has_key('access_token'):
                 return None
                 
-            parse_data = res_parse_qs['access_token']
-            uid = parse_data['uid'][-1]
-            access_token = parse_data['access_token'][-1]
+            access_token = res_parse_qs['access_token'][-1]
+
+        graph = facebook.GraphAPI(access_token) 
+        fb_data = graph.get_object("me")
+
+        if not fb_data:
+            return None
+
+        uid = fb_data['id']
+        username = uid
             
         try:
             fb_user = FacebookUserProfile.objects.get(facebook_uid=uid)
             return fb_user.user
 
         except FacebookUserProfile.DoesNotExist:
-            
             # create new FacebookUserProfile
-            graph = facebook.GraphAPI(access_token) 
-            fb_data = graph.get_object("me")
-
-            if not fb_data:
-                return None
-
-            username = uid
             if not user:
                 user = User.objects.create(username=username)
                 user.first_name = fb_data['first_name']
                 user.last_name = fb_data['last_name']
+                is_email_filled = False
+                if 'email' in fb_data:
+                    user.email = fb_data['email']
+                    is_email_filled = True
                 user.save()
                 
             fb_profile = FacebookUserProfile(facebook_uid=uid, user=user)
             fb_profile.save()
             
-            auth_meta = AuthMeta(user=user, provider='Facebook').save()
+            auth_meta = AuthMeta(user=user, provider='Facebook', is_email_filled=is_email_filled).save()
                 
             return user
 
